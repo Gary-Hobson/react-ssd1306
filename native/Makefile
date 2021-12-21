@@ -2,7 +2,7 @@ OBJDIR=.obj
 CC=gcc
 CFLAGS=-g -Wall -MMD -MF $(OBJDIR)/$(@F).d -Wno-array-bounds
 LDFLAGS=-flto
-CFLAGS_OPT=$(CFLAGS) -O2 -flto
+CFLAGS_OPT=$(CFLAGS) -O0 -flto
 DEFINES:=-D_GNU_SOURCE
 CFLAGS+=$(DEFINES)
 
@@ -12,11 +12,10 @@ INCLUDES=-I/usr/local/include/quickjs
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
-main: $(OBJDIR) $(OBJDIR)/renderer.o $(OBJDIR)/main.o $(OBJDIR)/oled96.o $(OBJDIR)/fonts.o
+main: $(OBJDIR) $(OBJDIR)/renderer.o $(OBJDIR)/main.o $(OBJDIR)/oled96.o $(OBJDIR)/fonts.o $(OBJDIR)/renderer.so
 	$(CC) $(LDFLAGS) $(CFLAGS_OPT) -o $@ \
 	$(OBJDIR)/renderer.o $(OBJDIR)/main.o $(OBJDIR)/oled96.o $(OBJDIR)/fonts.o \
-	$(LIBS) -lm -ldl
-	strip main
+	$(LIBS) -lm -ldl -lpthread
 
 $(OBJDIR)/renderer.o: renderer.c
 	$(CC) $(LDFLAGS) $(CFLAGS_OPT) -c $(INCLUDES) -o $@ renderer.c
@@ -27,13 +26,14 @@ $(OBJDIR)/oled96.o: oled96.c
 $(OBJDIR)/fonts.o: fonts.c
 	$(CC) $(CFLAGS_OPT) -c -o $@ fonts.c
 
+$(OBJDIR)/renderer.so:renderer.c
+	$(CC) $(LDFLAGS) $(CFLAGS_OPT) $(INCLUDES) -fPIC -shared -o $@ renderer.c
+
 $(OBJDIR)/main.o: main.c
 	$(CC) $(LDFLAGS) $(CFLAGS_OPT) -c $(INCLUDES) -o $@ main.c
 
-main.c: main.js
-	qjsc -flto -e -M ./c-renderer,renderer -m -o $@ main.js
+main.c: main.js $(OBJDIR)/renderer.so
+	qjsc -flto -e -M renderer,renderer -m -o $@ main.js
 
 clean:
-	rm ./main
-	rm main.c
-	rm -rf $(OBJDIR)
+	rm -rf ./main main.c $(OBJDIR)
